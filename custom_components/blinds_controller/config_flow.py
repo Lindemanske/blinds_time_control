@@ -1,20 +1,25 @@
+"""Config flow for Blinds Time Control integration."""
+from __future__ import annotations
+
 from homeassistant import config_entries
 from homeassistant.core import callback
 import voluptuous as vol
-import re
 
 from .const import DOMAIN
 
 
 class BlindsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Blinds Time Control."""
+
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
 
     @callback
     def _get_entity_ids(self):
+        """Get all entity IDs."""
         return self.hass.states.async_entity_ids()
 
     async def async_step_user(self, user_input=None):
+        """Handle the initial step."""
         errors = {}
         if user_input is not None:
             return self.async_create_entry(
@@ -34,15 +39,15 @@ class BlindsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required("tilt_closed"): vol.All(vol.Coerce(float), vol.Range(min=0)),
 
                     vol.Required("timed_control_down", default=False): bool,
-                    vol.Optional("time_to_roll_down", default = "12:00"): vol.All(vol.Coerce(str)),
+                    vol.Optional("time_to_roll_down", default="12:00"): vol.All(vol.Coerce(str)),
                     vol.Required("timed_control_up", default=False): bool,
-                    vol.Optional("time_to_roll_up", default = "12:00"): vol.All(vol.Coerce(str)),
+                    vol.Optional("time_to_roll_up", default="12:00"): vol.All(vol.Coerce(str)),
 
-                    vol.Required("delay_control",default=False): bool,
-                    vol.Optional("delay_sunrise",default=0): vol.All(vol.Coerce(int)),
-                    vol.Optional("delay_sunset",default=0): vol.All(vol.Coerce(int)),
+                    vol.Required("delay_control", default=False): bool,
+                    vol.Optional("delay_sunrise", default=0): vol.All(vol.Coerce(int)),
+                    vol.Optional("delay_sunset", default=0): vol.All(vol.Coerce(int)),
 
-                    vol.Required("night_lights",default=False): bool,
+                    vol.Required("night_lights", default=False): bool,
                     vol.Optional("entity_night_lights", default=None): vol.Any(None, vol.In(self._get_entity_ids())),
 
                     vol.Required("tilting_day", default=False): bool,
@@ -59,7 +64,6 @@ class BlindsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional("netamo_rain_entity", default=None): vol.Any(None, vol.In(self._get_entity_ids())),
                     vol.Optional("netamo_rain", default=40): vol.All(vol.Coerce(float)),
 
-
                     vol.Required("send_stop_at_end", default=True): bool
                 }
             ),
@@ -69,17 +73,24 @@ class BlindsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
+        """Get the options flow for this handler."""
         return BlindsOptionsFlow(config_entry)
 
+
 class BlindsOptionsFlow(config_entries.OptionsFlow):
+    """Handle options flow for Blinds Time Control."""
+
     def __init__(self, config_entry):
+        """Initialize options flow."""
         self.config_entry = config_entry
 
     @callback
     def _get_entity_ids(self):
+        """Get all entity IDs."""
         return self.hass.states.async_entity_ids()
 
     async def async_step_init(self, user_input=None):
+        """Manage the options."""
         if user_input is not None:
             updated_data = dict(self.config_entry.data)
             updated_data.update(user_input)
@@ -99,16 +110,16 @@ class BlindsOptionsFlow(config_entries.OptionsFlow):
                     vol.Required("tilt_closed", default=self.config_entry.data.get("tilt_closed", 0.0)): vol.All(vol.Coerce(float), vol.Range(min=0)),
                     
                     vol.Required("timed_control_down", default=self.config_entry.data.get("timed_control_down")): bool,
-                    vol.Optional("time_to_roll_down", default=self.config_entry.data.get("time_to_roll_down", "")) : vol.All(vol.Coerce(str)),
+                    vol.Optional("time_to_roll_down", default=self.config_entry.data.get("time_to_roll_down", "")): vol.All(vol.Coerce(str)),
                     vol.Required("timed_control_up", default=self.config_entry.data.get("timed_control_up")): bool,
-                    vol.Optional("time_to_roll_up", default=self.config_entry.data.get("time_to_roll_up", "")) : vol.All(vol.Coerce(str)),
+                    vol.Optional("time_to_roll_up", default=self.config_entry.data.get("time_to_roll_up", "")): vol.All(vol.Coerce(str)),
 
                     vol.Required("delay_control", default=self.config_entry.data.get("delay_control")): bool, 
                     vol.Optional("delay_sunrise", default=self.config_entry.data.get("delay_sunrise", 0)): vol.All(vol.Coerce(int)),
                     vol.Optional("delay_sunset", default=self.config_entry.data.get("delay_sunset", 0)): vol.All(vol.Coerce(int)),
 
                     vol.Required("night_lights", default=self.config_entry.data.get("night_lights")): bool, 
-                    vol.Optional("entity_night_lights", default=self.config_entry.data.get("entity_night_lights")) : vol.Any(None, vol.In(self._get_entity_ids())),
+                    vol.Optional("entity_night_lights", default=self.config_entry.data.get("entity_night_lights")): vol.Any(None, vol.In(self._get_entity_ids())),
 
                     vol.Required("tilting_day", default=self.config_entry.data.get("tilting_day")): bool,
 
