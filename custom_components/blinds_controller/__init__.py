@@ -1,25 +1,38 @@
-# Import necessary modules from Home Assistant
+"""The Blinds Time Control integration."""
+from __future__ import annotations
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.const import Platform
 
-# Import the domain constant from the current package
 from .const import DOMAIN
 
-async def async_setup(hass: HomeAssistant, config: dict):
-    # Return True here and the user will be able to initiate the config flow from the integrations page
+PLATFORMS: list[Platform] = [Platform.COVER]
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up Blinds Time Control from a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][entry.entry_id] = entry.data
+
+    # Forward the setup to the cover platform
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Register update listener for options flow
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+
     return True
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    # Set up your integration with the configuration entry
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry.data
-    # Load the cover platform with the configuration entry
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(entry, "cover")
-    )
-    return True
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
-    # Unload your integration when the configuration entry is removed
-    await hass.config_entries.async_forward_entry_unload(entry, "cover")
-    hass.data[DOMAIN].pop(entry.entry_id)
-    return True
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload config entry."""
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)
