@@ -1,3 +1,4 @@
+Upgraded to comply with version 2026.1.2 of home assistant. Assited by Claude.
 # Home Assistant Blinds Control Integration
 
 Upgrade your Home Assistant with this custom blinds control integration. It's designed to effortlessly manage your time-based blinds, syncing with your chosen entities for raising and lowering. Plus, it remembers your settings after restarts and supports tilting.
