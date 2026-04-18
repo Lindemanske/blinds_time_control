@@ -720,6 +720,10 @@ class BlindsCover(CoverEntity, RestoreEntity):
                     int(old_state.attributes.get(ATTR_CURRENT_TILT_POSITION))
                 )
 
+    async def async_will_remove_from_hass(self) -> None:
+        """Run when entity will be removed from hass."""
+        self.stop_auto_updater()
+
     def _handle_my_button(self) -> None:
         """Handle MY button press (stop)."""
         if self.travel_calc.is_traveling() or (

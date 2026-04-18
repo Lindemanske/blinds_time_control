@@ -90,7 +90,14 @@ class BlindsOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             updated_data = dict(self.config_entry.data)
             updated_data.update(user_input)
-            self.hass.config_entries.async_update_entry(entry=self.config_entry, data=updated_data)
+            self.hass.config_entries.async_update_entry(
+                entry=self.config_entry, data=updated_data
+            )
+            # Schedule reload as a separate task so the config flow can finish
+            # cleanly first - prevents a deadlock in the event loop.
+            self.hass.async_create_task(
+                self.hass.config_entries.async_reload(self.config_entry.entry_id)
+            )
             return self.async_create_entry(title="", data={})
 
         return self.async_show_form(

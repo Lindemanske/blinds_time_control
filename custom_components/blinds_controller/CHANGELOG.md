@@ -1,3 +1,32 @@
+# Changelog - Blinds Time Control v2.0.2
+
+## Bugfix: Home Assistant vastlopen bij opslaan configuratie
+
+### Oorzaak
+Bij het opslaan van een gewijzigde configuratie liep Home Assistant volledig vast (power cycle vereist). Twee samenhangende bugs veroorzaakten een deadlock in de event loop:
+
+**Bug 1 — Dubbele reload / deadlock:**
+De options flow riep `async_update_entry` aan (triggert update listener → start reload), gevolgd door `async_create_entry` (triggert de listener opnieuw → start een tweede reload). Twee gelijktijdige config entry reloads blokkeren de event loop volledig.
+
+**Bug 2 — Auto-updater loopt door na unload:**
+De 100ms positie-update timer (`auto_updater_hook`) werd nooit gestopt bij het verwijderen van de entiteit. Na een reload bleef de timer draaien op een verwijderde entiteit, wat schrijffouten en instabiliteit veroorzaakte.
+
+### Wijzigingen in v2.0.2
+
+#### **__init__.py**
+- ✅ Verwijderd: `add_update_listener` en `async_reload_entry` — de update listener triggerde een reload die botste met de reload vanuit de options flow
+- ✅ Vereenvoudigd: `async_setup_entry` en `async_unload_entry`
+
+#### **config_flow.py**
+- ✅ Opgelost: reload wordt nu ingepland via `hass.async_create_task(hass.config_entries.async_reload(...))` zodat de config flow eerst netjes afsluit vóór de reload begint
+
+#### **cover.py**
+- ✅ Toegevoegd: `async_will_remove_from_hass` stopt de auto-updater timer correct bij verwijdering van de entiteit (voorkomt timer leak na reload)
+
+Upgraded to comply with version 2026.4.2 of home assistant. Assisted by Claude.
+
+---
+
 # Changelog - Blinds Time Control v2.0.1
 
 ## Updates voor Home Assistant 2026.4.2 Compatibiliteit
