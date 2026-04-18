@@ -1,4 +1,25 @@
-# Changelog - Blinds Time Control v2.0.0
+# Changelog - Blinds Time Control v2.0.1
+
+## Updates voor Home Assistant 2026.4.2 Compatibiliteit
+
+### Wijzigingen in v2.0.1
+
+#### 1. **config_flow.py**
+- ✅ Verwijderd: `OptionsFlow.__init__(config_entry)` — volledig verwijderd als breaking change in HA 2026.4.x
+- ✅ Aangepast: `async_get_options_flow` geeft nu `BlindsOptionsFlow()` terug zonder argument; `self.config_entry` wordt automatisch gezet door de HA basisklasse
+
+#### 2. **cover.py**
+- ✅ Verwijderd: `SERVICE_CLOSE_COVER`, `SERVICE_OPEN_COVER`, `SERVICE_STOP_COVER` imports uit `homeassistant.const` (deprecated en verwijderd in HA 2026.x); vervangen door lokale string-constanten `_CMD_CLOSE`, `_CMD_OPEN`, `_CMD_STOP`
+- ✅ Vervangen: blokkerende `urllib.request.urlopen()` call voor Open-Meteo API → volledig async via `aiohttp` / `async_get_clientsession(hass)` (blokkerende I/O in de event loop is niet toegestaan in modern HA)
+- ✅ Verwijderd: `import urllib.request` en `import json` (niet meer nodig)
+- ✅ Toegevoegd: `from homeassistant.helpers.aiohttp_client import async_get_clientsession`
+- ✅ Verbeterd: alle event listeners en timers in `async_added_to_hass` worden nu correct afgemeld via `self.async_on_remove(...)` bij verwijderen van de entiteit (geheugenlek voorkomen)
+
+Upgraded to comply with version 2026.4.2 of home assistant. Assisted by Claude.
+
+---
+
+
 
 ## Updates voor Home Assistant 2025 Compatibiliteit
 

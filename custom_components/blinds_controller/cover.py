@@ -9,11 +9,6 @@ from homeassistant.components.cover import (
     CoverEntityFeature,
     CoverEntity,
 )
-from homeassistant.const import (
-    SERVICE_CLOSE_COVER,
-    SERVICE_OPEN_COVER,
-    SERVICE_STOP_COVER,
-)
 from homeassistant.helpers import entity_platform
 from homeassistant.core import callback, Event
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -21,12 +16,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval, async_track_state_change_event
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 import logging
 from datetime import datetime, timedelta, timezone
 import asyncio
-import urllib.request
-import json
 
 from .calculator import TravelCalculator, TravelStatus
 from .const import DOMAIN
@@ -35,6 +29,11 @@ _LOGGER = logging.getLogger(__name__)
 
 SERVICE_SET_KNOWN_POSITION = "set_known_position"
 SERVICE_SET_KNOWN_TILT_POSITION = "set_known_tilt_position"
+
+# Service name constants (avoid deprecated imports from homeassistant.const)
+_CMD_CLOSE = "close_cover"
+_CMD_OPEN = "open_cover"
+_CMD_STOP = "stop_cover"
 
 
 async def async_setup_entry(
@@ -270,13 +269,13 @@ class BlindsCover(CoverEntity, RestoreEntity):
             self._target_position = 0
             self.travel_calc.start_travel_down()
             self.start_auto_updater()
-            await self._async_handle_command(SERVICE_CLOSE_COVER)
+            await self._async_handle_command(_CMD_CLOSE)
         else:
-            self.update_tilt_before_travel(SERVICE_CLOSE_COVER)
+            self.update_tilt_before_travel(_CMD_CLOSE)
             self._target_position = 0
             self.travel_calc.start_travel_down()
             self.start_auto_updater()
-            await self._async_handle_command(SERVICE_CLOSE_COVER)
+            await self._async_handle_command(_CMD_CLOSE)
 
     async def async_open_cover(self, **kwargs) -> None:
         """Turn the device open."""
@@ -285,19 +284,19 @@ class BlindsCover(CoverEntity, RestoreEntity):
             self._target_position = 100
             self.travel_calc.start_travel_up()
             self.start_auto_updater()
-            await self._async_handle_command(SERVICE_OPEN_COVER)
+            await self._async_handle_command(_CMD_OPEN)
         else:
-            self.update_tilt_before_travel(SERVICE_OPEN_COVER)
+            self.update_tilt_before_travel(_CMD_OPEN)
             self._target_position = 100
             self.travel_calc.start_travel_up()
             self.start_auto_updater()
-            await self._async_handle_command(SERVICE_OPEN_COVER)
+            await self._async_handle_command(_CMD_OPEN)
 
     async def async_stop_cover(self, **kwargs) -> None:
         """Turn the device stop."""
         _LOGGER.debug("async_stop_cover")
         self._handle_my_button()
-        await self._async_handle_command(SERVICE_STOP_COVER)
+        await self._async_handle_command(_CMD_STOP)
 
     async def async_open_cover_tilt(self, **kwargs) -> None:
         """Open the cover tilt."""
@@ -336,23 +335,23 @@ class BlindsCover(CoverEntity, RestoreEntity):
             if position < current_position:
                 self.travel_calc.start_travel(position)
                 self.start_auto_updater()
-                await self._async_handle_command(SERVICE_CLOSE_COVER)
+                await self._async_handle_command(_CMD_CLOSE)
             elif position > current_position:
                 self.travel_calc.start_travel(position)
                 self.start_auto_updater()
-                await self._async_handle_command(SERVICE_OPEN_COVER)
+                await self._async_handle_command(_CMD_OPEN)
         else:
             self._target_position = position
             if position < current_position:
-                self.update_tilt_before_travel(SERVICE_CLOSE_COVER)
+                self.update_tilt_before_travel(_CMD_CLOSE)
                 self.travel_calc.start_travel(position)
                 self.start_auto_updater()
-                await self._async_handle_command(SERVICE_CLOSE_COVER)
+                await self._async_handle_command(_CMD_CLOSE)
             elif position > current_position:
-                self.update_tilt_before_travel(SERVICE_OPEN_COVER)
+                self.update_tilt_before_travel(_CMD_OPEN)
                 self.travel_calc.start_travel(position)
                 self.start_auto_updater()
-                await self._async_handle_command(SERVICE_OPEN_COVER)
+                await self._async_handle_command(_CMD_OPEN)
 
     async def set_tilt_position(self, tilt_position: int) -> None:
         """Move cover tilt to a designated position."""
@@ -375,10 +374,10 @@ class BlindsCover(CoverEntity, RestoreEntity):
         if not self.has_tilt_support():
             return
 
-        if command == SERVICE_CLOSE_COVER:
+        if command == _CMD_CLOSE:
             self._target_tilt_position = 0
             self.tilt_calc.start_travel_down()
-        elif command == SERVICE_OPEN_COVER:
+        elif command == _CMD_OPEN:
             self._target_tilt_position = 100
             self.tilt_calc.start_travel_up()
 
@@ -546,15 +545,19 @@ class BlindsCover(CoverEntity, RestoreEntity):
         if self._protect_the_blinds:
             try:
                 latitude, longitude = self.get_location_coordinates(self.hass)
-                url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current_weather=true"
-                
-                with urllib.request.urlopen(url, timeout=10) as response:
-                    data = json.loads(response.read().decode())
-                    
+                url = (
+                    f"https://api.open-meteo.com/v1/forecast"
+                    f"?latitude={latitude}&longitude={longitude}&current_weather=true"
+                )
+
+                session = async_get_clientsession(self.hass)
+                async with session.get(url, timeout=10) as response:
+                    data = await response.json()
+
                     if "current_weather" in data:
                         wind_speed = data["current_weather"].get("windspeed", 0)
                         weather_code = data["current_weather"].get("weathercode", 0)
-                        
+
                         if wind_speed >= self._set_wind_speed or weather_code >= self._wmo_code:
                             current_position = self.travel_calc.current_position()
                             if current_position != 0:
@@ -564,7 +567,7 @@ class BlindsCover(CoverEntity, RestoreEntity):
                                     weather_code,
                                 )
                                 await self.async_close_cover()
-                        
+
                         _LOGGER.info("Wind speed: %s, Weather code: %s", wind_speed, weather_code)
             except Exception as e:
                 _LOGGER.error("Error retrieving weather data: %s", e)
@@ -647,7 +650,7 @@ class BlindsCover(CoverEntity, RestoreEntity):
                 self.start_auto_updater()
             else:
                 if not self.tilt_calc.is_traveling():
-                    self.update_tilt_before_travel(SERVICE_OPEN_COVER)
+                    self.update_tilt_before_travel(_CMD_OPEN)
                     if self._target_position not in (0, 100):
                         self.travel_calc.start_travel(self._target_position)
                     else:
@@ -664,7 +667,7 @@ class BlindsCover(CoverEntity, RestoreEntity):
                 self.start_auto_updater()
             else:
                 if not self.tilt_calc.is_traveling():
-                    self.update_tilt_before_travel(SERVICE_CLOSE_COVER)
+                    self.update_tilt_before_travel(_CMD_CLOSE)
                     if self._target_position not in (0, 100):
                         self.travel_calc.start_travel(self._target_position)
                     else:
@@ -676,17 +679,25 @@ class BlindsCover(CoverEntity, RestoreEntity):
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""
-        self.hass.bus.async_listen("state_changed", self._handle_state_changed)
+        self.async_on_remove(
+            self.hass.bus.async_listen("state_changed", self._handle_state_changed)
+        )
 
-        # Set up periodic time update
-        async_track_time_interval(self.hass, self.add_ons, timedelta(minutes=1))
+        # Set up periodic time update (store unsubscribe for cleanup)
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self.add_ons, timedelta(minutes=1))
+        )
 
         # Track sun sensors
-        async_track_state_change_event(
-            self.hass, "sensor.sun_next_dawn", self.sun_state_changed
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass, "sensor.sun_next_dawn", self.sun_state_changed
+            )
         )
-        async_track_state_change_event(
-            self.hass, "sensor.sun_next_dusk", self.sun_state_changed
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass, "sensor.sun_next_dusk", self.sun_state_changed
+            )
         )
 
         # Restore previous state
@@ -733,16 +744,16 @@ class BlindsCover(CoverEntity, RestoreEntity):
                 if ((current_position > 0) and (current_position < 100)) or (
                     (current_tilt_position > 0) and (current_tilt_position < 100)
                 ):
-                    await self._async_handle_command(SERVICE_STOP_COVER)
+                    await self._async_handle_command(_CMD_STOP)
                 else:
                     if self._send_stop_at_end:
-                        await self._async_handle_command(SERVICE_STOP_COVER)
+                        await self._async_handle_command(_CMD_STOP)
             else:
                 if (current_position > 0) and (current_position < 100):
-                    await self._async_handle_command(SERVICE_STOP_COVER)
+                    await self._async_handle_command(_CMD_STOP)
                 else:
                     if self._send_stop_at_end:
-                        await self._async_handle_command(SERVICE_STOP_COVER)
+                        await self._async_handle_command(_CMD_STOP)
 
     async def _async_handle_command(self, command: str, *args) -> None:
         """Handle commands to control the cover switches."""

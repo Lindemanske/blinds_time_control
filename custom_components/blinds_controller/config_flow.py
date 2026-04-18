@@ -74,15 +74,11 @@ class BlindsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
-        return BlindsOptionsFlow(config_entry)
+        return BlindsOptionsFlow()
 
 
 class BlindsOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow for Blinds Time Control."""
-
-    def __init__(self, config_entry):
-        """Initialize options flow."""
-        self.config_entry = config_entry
 
     @callback
     def _get_entity_ids(self):
